@@ -54,7 +54,13 @@ export const Config = Schema.intersect([
         .description('默认每页显示的记录数，最多30条'),
     }),
     Schema.object({})
-  ])
+  ]),
+
+  Schema.object({
+    enableVerboseConsoleLog: Schema.boolean()
+      .default(false)
+      .description('是否在控制台打印更多日志， <br> 仅供调试时使用，平时请勿开启'),
+  }).description('调试配置')
 
 ])
 
@@ -75,6 +81,7 @@ declare module 'koishi' {
       id: string
       messageId: string
       platform: string
+      channelId: string
       mentionedUserId: string
       authorUserId: string
     }
@@ -101,6 +108,7 @@ export function apply(ctx: Context, config: any) {
     id: 'string',
     messageId: 'string', // 消息 ID
     platform: 'string',  // 平台
+    channelId: 'string', // 频道ID（如QQ群号）
     mentionedUserId: 'string',    // 被 @ 的用户 ID
     authorUserId: 'string',    // 消息的作者用户 ID
   }, {
@@ -120,7 +128,7 @@ export function apply(ctx: Context, config: any) {
 
   async function saveAtDbFunc(session: Session, next) {
     if (session.elements.some(element => element.type === 'at')) {
-      const { platform, messageId, userId, content, timestamp } = session;
+      const { platform, messageId, channelId, userId, content, timestamp } = session;
 
       // 检查必需的字段是否存在，以确保数据完整性
       if (!platform || !messageId || !content || !timestamp) {
@@ -148,6 +156,7 @@ export function apply(ctx: Context, config: any) {
             mentionRecords.push({
               platform,
               messageId,
+              channelId,
               mentionedUserId: mention.attrs.id,
               authorUserId: session.userId,
             });

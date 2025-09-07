@@ -7,25 +7,31 @@ export function who_at_me(ctx: Context, config: any) {
 
   ctx.command('who-at-me', '查询最近谁@了我')
     .alias('谁艾特我')
-    .option('page', '-p <page:number> 页码，从1开始', { fallback: config.defaultPage || 1 })
-    .option('pagesize', '-s <pagesize:number> 每页显示条数', { fallback: config.defaultPageSize || 10 })
+    .option('page', '-p, --page <page:number> 页码，从1开始', { fallback: config.defaultPage || 1 })
+    .option('pagesize', '-s, --pagesize <pagesize:number> 每页显示条数', { fallback: config.defaultPageSize || 10 })
+    .option('only_this_channel', '-o, --only-this-channel <only_this_channel:string> true:当前频道, false:全平台', { fallback: true })
     .action(async ({ session, options }) => {
 
       try {
         // 验证参数
-        const page = Math.max(1, options.page || 1);
-        const pageSize = Math.max(1, Math.min(50, options.pagesize || 10)); // 限制最大50条
+        const page = Math.max(1, options.page || config.defaultPage || 1);
+        const pageSize = Math.max(1, Math.min(50, options.pagesize || config.defaultPageSize || 10)); // 限制最大50条
+
+        // 根据参数决定是否传递channelId
+        const ONLY_THIS_CHANNEL = options.only_this_channel==='false' ? false : true;
+        const queryChannelId = ONLY_THIS_CHANNEL ? session.channelId : null;
+        const scopeText = ONLY_THIS_CHANNEL? '当前频道' : '全平台';
         
-        const hintMsgId = await session.send(`${h.quote(session.messageId)}正在查询第${page}页@记录(每页${pageSize}条)，请稍候...`);
+        const hintMsgId = await session.send(`${h.quote(session.messageId)}正在查询${scopeText}第${page}页@记录(每页${pageSize}条)，请稍候...`);
 
         let whoAtMeMessage;
 
         if (config.messageForm === MESSSAGE_FORM.TEXT) {
-          whoAtMeMessage = await formatWhoAtMeAsText(ctx, session, page, pageSize, whoAtMeLogger);
+          whoAtMeMessage = await formatWhoAtMeAsText(ctx, session, queryChannelId, page, pageSize, whoAtMeLogger);
         } else if (config.messageForm === MESSSAGE_FORM.IMAGE) {
-          whoAtMeMessage = await formatWhoAtMeAsImage(ctx, session, page, pageSize, whoAtMeLogger);
+          whoAtMeMessage = await formatWhoAtMeAsImage(ctx, session, queryChannelId, page, pageSize, whoAtMeLogger);
         } else if (config.messageForm === MESSSAGE_FORM.FORWARD) {
-          whoAtMeMessage = await formatWhoAtMeAsForward(ctx, session, page, pageSize, whoAtMeLogger);
+          whoAtMeMessage = await formatWhoAtMeAsForward(ctx, session, queryChannelId, page, pageSize, whoAtMeLogger);
         }
 
         await session.send(whoAtMeMessage);
@@ -59,12 +65,13 @@ interface PaginatedResult {
   hasPrev: boolean;
 }
 
-async function getAtMentionRecords(ctx: Context, platform: string, userId: string, page: number, pageSize: number): Promise<PaginatedResult> {
+async function getAtMentionRecords(ctx: Context, platform: string, userId: string, channelId: string | null, page: number, pageSize: number): Promise<PaginatedResult> {
   try {
     // 先从mentions表获取相关的messageId
     const mentionRecords = await ctx.database.get('who_at_me_mentions', {
       platform: platform,
       mentionedUserId: userId,
+      ...( channelId ? { channelId: channelId } : {})
     });
 
     if (mentionRecords.length === 0) {
@@ -117,31 +124,40 @@ async function getAtMentionRecords(ctx: Context, platform: string, userId: strin
   }
 }
 
-async function parseMessageContent(ctx: Context, session: any, content: string): Promise<string> {
+async function parseMessageContent(ctx: Context, session: any, content: string): Promise<any> {
   const elements = h.parse(content);
   // console.log(`[debug]elements = ${JSON.stringify(elements)}`);
 
-  let parsedContent = '';
+  // let parsedContent = '';
+  let resArr = []
   for (let i = 0; i < elements.length; i++) {
     const e = elements[i];
     if (e.type === 'text') {
-      parsedContent += e.attrs.content;
+      resArr.push(e.attrs.content);
     } else if (e.type === 'at') {
       const userObj = await session.bot.getGuildMember(session.guildId, e.attrs.id);
-      parsedContent += `@${userObj.nick}`;
-    } else {
-      parsedContent += `[${e.type}]`;
+      // console.log(`userObj = ${JSON.stringify(userObj)}`);
+      resArr.push(`@${userObj.nick}`);
+    } 
+    // else if (e.type === 'face') {
+    //   //onebot表情可以发送原始的，不是很占空间
+    //   resArr.push(e); 
+    //   // console.log(`face e = ${JSON.stringify(e)}`);
+    // } 
+    else {
+      resArr.push(`[${e.type}]`);
     }
   }
-  return parsedContent;
+  return (resArr);
 }
 
-async function formatWhoAtMeAsText(ctx: Context, session: any, page: number, pageSize: number, logger: Logger): Promise<Array<h>> {
-  const result = await getAtMentionRecords(ctx, session.platform, session.userId, page, pageSize);
+async function formatWhoAtMeAsText(ctx: Context, session: any, channelId: string | null, page: number, pageSize: number, logger: Logger): Promise<Array<h>> {
+  const result = await getAtMentionRecords(ctx, session.platform, session.userId, channelId, page, pageSize);
 
   if (result.records.length === 0) {
     if (result.totalCount === 0) {
-      return [h.quote(session.messageId), h.text('最近没有人@你哦~')];
+      const scopeText = channelId ? '当前频道' : '全平台';
+      return [h.quote(session.messageId), h.text(`${scopeText}最近没有人@你哦~`)];
     } else {
       return [h.quote(session.messageId), h.text(`第${page}页没有记录，总共${result.totalPages}页`)];
     }
@@ -149,39 +165,45 @@ async function formatWhoAtMeAsText(ctx: Context, session: any, page: number, pag
 
   let res: Array<any> = [];
   res.push(h.quote(session.messageId));
-  res.push(h.text(`第${result.currentPage}/${result.totalPages}页 (共${result.totalCount}条@记录):\n\n`));
+  const scopeText = channelId ? '当前频道' : '全平台';
+  res.push(h.text(`${scopeText}第${result.currentPage}/${result.totalPages}页 (共${result.totalCount}条@记录):\n\n`));
 
   for (let i = 0; i < result.records.length; i++) {
     const record = result.records[i];
     const date = new Date(record.timestamp).toLocaleString('zh-CN');
     const globalIndex = (result.currentPage - 1) * result.pageSize + i + 1;
+
+    const authorUserObj = await session.bot.getGuildMember(session.guildId, record.userId);
     
-    res.push(h.text(`------------------\n`));
-    res.push(h.text(`${globalIndex}. [${date}]\n`));
-    res.push(await parseMessageContent(ctx, session, record.content));
-    res.push(h.text('\n\n'));
+    res.push( h.text(`------------------\n`) );
+    res.push( h.text(`${globalIndex}. [${date}]\n`) );
+    res.push( h.text(`消息作者: ${authorUserObj.user.name} ${authorUserObj.nick ? `(${authorUserObj.nick})` : ''} (${authorUserObj.user.userId})\n`) );
+    res.push( ...(await parseMessageContent(ctx, session, record.content)) );
+    res.push( h.text('\n\n') );
   }
 
   // 添加分页导航提示
   if (result.totalPages > 1) {
-    res.push(h.text(`------------------\n`));
+    res.push( h.text(`------------------\n`) );
+    const onlyChannelFlag = channelId ? '' : ' --no-only-this-channel';
     if (result.hasPrev) {
-      res.push(h.text(`上一页: who-at-me -p ${result.currentPage - 1} -s ${result.pageSize}\n`));
+      res.push( h.text(`上一页: who-at-me -p ${result.currentPage - 1} -s ${result.pageSize}${onlyChannelFlag}\n`) );
     }
     if (result.hasNext) {
-      res.push(h.text(`下一页: who-at-me -p ${result.currentPage + 1} -s ${result.pageSize}\n`));
+      res.push( h.text(`下一页: who-at-me -p ${result.currentPage + 1} -s ${result.pageSize}${onlyChannelFlag}\n`) );
     }
   }
 
   return res;
 }
 
-async function formatWhoAtMeAsImage(ctx: Context, session: any, page: number, pageSize: number, logger: Logger): Promise<Array<h>> {
-  const result = await getAtMentionRecords(ctx, session.platform, session.userId, page, pageSize);
+async function formatWhoAtMeAsImage(ctx: Context, session: any, channelId: string | null, page: number, pageSize: number, logger: Logger): Promise<Array<h>> {
+  const result = await getAtMentionRecords(ctx, session.platform, session.userId, channelId, page, pageSize);
 
   if (result.records.length === 0) {
     if (result.totalCount === 0) {
-      return [h.quote(session.messageId), h.text('最近没有人@你哦~')];
+      const scopeText = channelId ? '当前频道' : '全平台';
+      return [h.quote(session.messageId), h.text(`${scopeText}最近没有人@你哦~`)];
     } else {
       return [h.quote(session.messageId), h.text(`第${page}页没有记录，总共${result.totalPages}页`)];
     }
@@ -193,7 +215,7 @@ async function formatWhoAtMeAsImage(ctx: Context, session: any, page: number, pa
 
   const page_puppeteer = await ctx.puppeteer.page();
   try {
-    const htmlContent = await getWhoAtMeImageHtmlTemplate(ctx, session, result);
+    const htmlContent = await getWhoAtMeImageHtmlTemplate(ctx, session, result, channelId);
 
     await page_puppeteer.setViewport({ width: 700, height: 1 });
     await page_puppeteer.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
@@ -213,17 +235,19 @@ async function formatWhoAtMeAsImage(ctx: Context, session: any, page: number, pa
 
     let res: Array<any> = [];
     res.push(h.quote(session.messageId));
-    res.push(h.text(`第${result.currentPage}/${result.totalPages}页 (共${result.totalCount}条@记录):\n`));
+    const scopeText = channelId ? '当前频道' : '全平台';
+    res.push(h.text(`${scopeText}第${result.currentPage}/${result.totalPages}页 (共${result.totalCount}条@记录):\n`));
     res.push(h.image(`data:image/png;base64,${screenshot}`));
 
     // 添加分页导航提示
     if (result.totalPages > 1) {
       let navText = '';
+      const onlyChannelFlag = channelId ? '' : ' --no-only-this-channel';
       if (result.hasPrev) {
-        navText += `上一页: who-at-me -p ${result.currentPage - 1} -s ${result.pageSize}\n`;
+        navText += `上一页: who-at-me -p ${result.currentPage - 1} -s ${result.pageSize}${onlyChannelFlag}\n`;
       }
       if (result.hasNext) {
-        navText += `下一页: who-at-me -p ${result.currentPage + 1} -s ${result.pageSize}`;
+        navText += `下一页: who-at-me -p ${result.currentPage + 1} -s ${result.pageSize}${onlyChannelFlag}`;
       }
       if (navText) {
         res.push(h.text(navText));
@@ -236,12 +260,13 @@ async function formatWhoAtMeAsImage(ctx: Context, session: any, page: number, pa
   }
 }
 
-async function formatWhoAtMeAsForward(ctx: Context, session: any, page: number, pageSize: number, logger: Logger): Promise<string> {
-  const result = await getAtMentionRecords(ctx, session.platform, session.userId, page, pageSize);
+async function formatWhoAtMeAsForward(ctx: Context, session: any, channelId: string | null, page: number, pageSize: number, logger: Logger): Promise<string> {
+  const result = await getAtMentionRecords(ctx, session.platform, session.userId, channelId, page, pageSize);
 
   if (result.records.length === 0) {
     if (result.totalCount === 0) {
-      return '最近没有人@你哦~';
+      const scopeText = channelId ? '当前频道' : '全平台';
+      return `${scopeText}最近没有人@你哦~`;
     } else {
       return `第${page}页没有记录，总共${result.totalPages}页`;
     }
@@ -259,10 +284,11 @@ async function formatWhoAtMeAsForward(ctx: Context, session: any, page: number, 
   };
 
   // First message: The title
+  const scopeText = channelId ? '当前频道' : '全平台';
   await addMessageBlock(
     undefined,
     '谁@了我 记录查询:',
-    `第${result.currentPage}/${result.totalPages}页 (共${result.totalCount}条@记录)`
+    `${scopeText}第${result.currentPage}/${result.totalPages}页 (共${result.totalCount}条@记录)`
   );
 
   // Subsequent messages: Each @mention record
@@ -271,23 +297,30 @@ async function formatWhoAtMeAsForward(ctx: Context, session: any, page: number, 
     const date = new Date(record.timestamp).toLocaleString('zh-CN');
     const globalIndex = (result.currentPage - 1) * result.pageSize + i + 1;
 
-    const userObj = await session.bot.getGuildMember(session.guildId, record.userId);
+    const authorUserObj = await session.bot.getGuildMember(session.guildId, record.userId);
+
+    let messageBlockContentArr = [
+      `${globalIndex}. [${date}]\n`,
+      `消息作者: ${authorUserObj.user.name} ${authorUserObj.nick ? `(${authorUserObj.nick})` : ''} (${authorUserObj.user.userId})\n\n`,
+      `${(await parseMessageContent(ctx, session, record.content)).join('')}`
+    ];
 
     await addMessageBlock(
-      userObj.userId,
-      userObj.nick,
-      `${globalIndex}. [${date}]\n${await parseMessageContent(ctx, session, record.content)}`
+      authorUserObj.user.userId,
+      `No.${i} ${authorUserObj.user.name}`,
+      messageBlockContentArr.join('')
     );
   }
 
   // 添加分页导航消息
   if (result.totalPages > 1) {
     let navText = '';
+    const onlyChannelFlag = channelId ? '' : ' --no-only-this-channel';
     if (result.hasPrev) {
-      navText += `上一页: who-at-me -p ${result.currentPage - 1} -s ${result.pageSize}\n`;
+      navText += `上一页: who-at-me -p ${result.currentPage - 1} -s ${result.pageSize}${onlyChannelFlag}\n`;
     }
     if (result.hasNext) {
-      navText += `下一页: who-at-me -p ${result.currentPage + 1} -s ${result.pageSize}`;
+      navText += `下一页: who-at-me -p ${result.currentPage + 1} -s ${result.pageSize}${onlyChannelFlag}`;
     }
     if (navText) {
       await addMessageBlock(undefined, '分页导航', navText);
@@ -301,13 +334,26 @@ async function getRecordItemsHtml(ctx: Context, session: any, records: AtMention
   const htmlPromises = records.map(async (record, index) => {
     const date = new Date(record.timestamp).toLocaleString('zh-CN');
     const globalIndex = (currentPage - 1) * pageSize + index + 1;
+    
+    // 获取作者信息
+    const authorUserObj = await session.bot.getGuildMember(session.guildId, record.userId);
+    const authorName = authorUserObj.user.name;
+    const authorNick = authorUserObj.nick;
+    const authorUserId = authorUserObj.user.userId;
+    
     return `
       <div class="record-item">
         <div class="record-header">
           <span class="record-number">${globalIndex}.</span>
           <span class="record-date">[${date}]</span>
         </div>
-        <p class="record-content">${await parseMessageContent(ctx, session, record.content)}</p>
+        <div class="author-info">
+          <span class="author-label">消息作者:</span>
+          <span class="author-name">${authorName}</span>
+          ${authorNick ? `<span class="author-nick">(${authorNick})</span>` : ''}
+          <span class="author-id">(${authorUserId})</span>
+        </div>
+        <p class="record-content">${(await parseMessageContent(ctx, session, record.content)).join('')}</p>
       </div>
     `;
   });
@@ -315,7 +361,7 @@ async function getRecordItemsHtml(ctx: Context, session: any, records: AtMention
   return (await Promise.all(htmlPromises)).join('');
 }
 
-async function getWhoAtMeImageHtmlTemplate(ctx: Context, session: any, result: PaginatedResult): Promise<string> {
+async function getWhoAtMeImageHtmlTemplate(ctx: Context, session: any, result: PaginatedResult, channelId: string | null): Promise<string> {
   const colors = {
     bg: '#f0f0f0',
     cardBg: 'rgba(255, 255, 255, 0.7)',
@@ -327,7 +373,11 @@ async function getWhoAtMeImageHtmlTemplate(ctx: Context, session: any, result: P
     separator: 'rgba(0, 0, 0, 0.2)',
     recordSeparator: 'rgba(0, 0, 0, 0.1)',
     footerText: '#888',
+    authorText: '#2c5aa0',
+    authorBg: 'rgba(60, 92, 158, 0.1)',
   };
+
+  const scopeText = channelId ? '当前频道' : '全平台';
 
   return `
     <html>
@@ -343,9 +393,14 @@ async function getWhoAtMeImageHtmlTemplate(ctx: Context, session: any, result: P
         .pagination-info{font-size:0.9em;color:${colors.subText};margin-top:5px}
         .record-item{display:flex;flex-direction:column;gap:8px;padding-bottom:15px;border-bottom:1px solid ${colors.recordSeparator}}
         .record-item:last-child{border-bottom:none;padding-bottom:0}
-        .record-header{display:flex;align-items:center;gap:10px}
+        .record-header{display:flex;align-items:center;gap:10px;margin-bottom:5px}
         .record-number{font-weight:700;color:${colors.titleColor};font-size:1.2em}
         .record-date{font-size:0.9em;color:${colors.subText}}
+        .author-info{display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:6px 10px;background:${colors.authorBg};border-radius:6px;font-size:0.9em}
+        .author-label{color:${colors.subText};font-weight:600}
+        .author-name{color:${colors.authorText};font-weight:600}
+        .author-nick{color:${colors.authorText};font-style:italic}
+        .author-id{color:${colors.subText};font-family:monospace;font-size:0.85em}
         .record-content{font-size:1.1em;line-height:1.6;color:${colors.mainText};margin:0;word-wrap:break-word}
         .footer{text-align:center;font-size:0.9em;color:${colors.footerText};margin-top:10px}
       </style>
@@ -354,7 +409,7 @@ async function getWhoAtMeImageHtmlTemplate(ctx: Context, session: any, result: P
       <div class="card">
         <div class="header">
           <div class="title">谁@了我</div>
-          <div class="subtitle">@记录查询</div>
+          <div class="subtitle">${scopeText}@记录查询</div>
           <div class="pagination-info">第${result.currentPage}/${result.totalPages}页 (共${result.totalCount}条记录)</div>
         </div>
         <div class="record-list">
