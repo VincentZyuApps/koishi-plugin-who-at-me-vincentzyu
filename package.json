@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-who-at-me",
   "description": "谁艾特我",
-  "version": "0.0.1",
+  "version": "0.0.1-beta1",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -9,13 +9,11 @@
     "dist"
   ],
   "license": "MIT",
-  "scripts": {},
   "keywords": [
     "chatbot",
     "koishi",
     "plugin"
   ],
-  "devDependencies": {},
   "peerDependencies": {
     "koishi": "^4.18.7"
   }
