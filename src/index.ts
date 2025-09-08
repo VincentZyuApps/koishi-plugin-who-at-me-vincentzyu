@@ -22,7 +22,7 @@ export const Config = Schema.intersect([
       enableMiddlewareSaveAtDb: Schema.const(true).required(),
       usePrependMiddleware: Schema.boolean()
         .default(true)
-        .description('是否使用koishi的前置中间件， <br> 优先级：前置中间件 > 指令 > 普通中间件'),
+        .description('是否使用koishi的前置中间件, <br> 优先级：前置中间件 > 指令 > 普通中间件'),
     }),
     Schema.object({})
   ]),
@@ -39,11 +39,13 @@ export const Config = Schema.intersect([
       enableWhoAtMeCommand: Schema.const(true).required(),
       messageForm: Schema.union([
         Schema.const(MESSSAGE_FORM.TEXT).description('文本消息'),
-        // Schema.const(MESSSAGE_FORM.TEXT_WITH_IMAGE).description('图文消息段混合消息'),
         Schema.const(MESSSAGE_FORM.IMAGE).description('图片消息'),
         Schema.const(MESSSAGE_FORM.FORWARD).description('合并转发消息(目前我已知支持的 好像只有onebot awa)'),
       ]).role('radio')
         .description('bot输出 谁艾特我记录的时候 使用的消息格式'),
+      enableTargetUserArg: Schema.boolean()
+        .default(false)
+        .description('是否允许 在参数中 传入 at元素 进行 指定用户的被艾特记录查找'),
       defaultPage: Schema.number()
         .default(1)
         .min(1).step(1)
@@ -167,7 +169,8 @@ export function apply(ctx: Context, config: any) {
         // 复合主键会防止同一个消息重复 @ 同一个人时产生重复记录
         await ctx.database.upsert('who_at_me_mentions', mentionRecords);
 
-        ctx.logger.info(`已记录包含 @ 的消息: ${messageId}`);
+        if ( config.enableVerboseConsoleLog )
+          ctx.logger.info(`已记录包含 @ 的消息: ${messageId}`);
       } catch (e) {
         ctx.logger.error('存储 @ 消息时出错:', e);
       }
