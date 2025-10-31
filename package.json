@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-who-at-me",
   "description": "谁艾特我",
-  "version": "0.0.2-alpha1",
+  "version": "0.0.2-alpha2",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
