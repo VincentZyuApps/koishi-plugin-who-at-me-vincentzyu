@@ -1,6 +1,7 @@
 import { Context } from 'koishi'
 import { who_at_me } from './command'
 export { Config } from './config'
+export { usage } from './usage'
 import { setupDatabase, createSaveAtDbMiddleware } from './database'
 
 export const name = 'who-at-me-vincentzyu'

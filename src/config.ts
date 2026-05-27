@@ -114,7 +114,7 @@ export const Config = Schema.intersect([
       .min(5).max(30).step(1)
       .description('📏 默认每页显示的记录数（最多 30 条）'),
     textFontPath: Schema.string()
-      .default('G:\GGames\Minecraft\shuyeyun\qq-bot\ledao\koishi-ledao-dev\external\awa-quote-image\assets\LXGWWenKaiMono-Regular.ttf')
+      .default('G:\\GGames\\Minecraft\\shuyeyun\\qq-bot\\ledao\\koishi-ledao-dev\\external\\awa-quote-image\\assets\\LXGWWenKaiMono-Regular.ttf')
       .role('textarea', { rows: [2, 5] })
       .description('🔤 自定义字体文件路径, 给Puppeteer出图用的（绝对路径，留空则使用系统默认字体）'),
   }).description('📋 指令详细配置'),
