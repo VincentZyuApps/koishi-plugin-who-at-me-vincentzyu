@@ -107,7 +107,7 @@ export const Config = Schema.intersect([
     ]).role('radio')
       .description('📤 Bot 输出「谁艾特我」记录时使用的消息格式'),
     enableTargetUserArg: Schema.boolean()
-      .default(false)
+      .default(true)
       .description('👤 是否允许在参数中传入 @ 元素<br>🔍 用于查找指定用户的被 @ 记录'),
     defaultPage: Schema.number()
       .default(1)
