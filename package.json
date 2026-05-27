@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-who-at-me-vincentzyu",
   "description": "📬 谁艾特我：自动监听并记录群聊中的 @ 消息，支持通过指令分页查询最近谁提到了你，也可按当前频道或全平台检索，并支持文本、图片、合并转发三种结果展示。",
-  "version": "0.1.0-beta.1+20260527",
+  "version": "0.1.1-beta.1+20260527",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
