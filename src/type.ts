@@ -12,6 +12,14 @@ export const ELEMENT_TYPE_MAP: { [key: string]: string } = {
   'face': 'QQ表情'
 } as const;
 
+export const IMAGE_TYPES = {
+  PNG: 'png',
+  JPEG: 'jpeg',
+  WEBP: 'webp',
+} as const;
+
+export type ImageType = typeof IMAGE_TYPES[keyof typeof IMAGE_TYPES];
+
 export interface AtMentionRecord {
   messageId: string;
   userId: string;

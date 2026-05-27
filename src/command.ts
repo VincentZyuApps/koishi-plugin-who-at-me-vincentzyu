@@ -41,7 +41,7 @@ export function who_at_me(ctx: Context, config: any) {
         if (config.messageForm === MESSSAGE_FORM.TEXT) {
           whoAtMeMessage = await formatWhoAtMeAsText(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger);
         } else if (config.messageForm === MESSSAGE_FORM.IMAGE) {
-          whoAtMeMessage = await formatWhoAtMeAsImage(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, config.textFontPath, config.renderColors);
+          whoAtMeMessage = await formatWhoAtMeAsImage(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, config.textFontPath, config.renderColors, config.imageType, config.screenshotQuality);
         } else if (config.messageForm === MESSSAGE_FORM.FORWARD) {
           whoAtMeMessage = await formatWhoAtMeAsForward(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger);
         }

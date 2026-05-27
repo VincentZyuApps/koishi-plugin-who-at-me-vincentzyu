@@ -1,6 +1,6 @@
 import { Context, h, Logger } from "koishi";
 import { } from 'koishi-plugin-puppeteer';
-import { AtMentionRecord, PaginatedResult } from "./type";
+import { AtMentionRecord, PaginatedResult, IMAGE_TYPES, ImageType } from "./type";
 import { RenderColors, defaultColors } from "./config";
 import fs from 'fs';
 import path from 'path';
@@ -140,24 +140,24 @@ async function getWhoAtMeImageHtmlTemplate(ctx: Context, session: any, result: P
       <meta charset="utf-8" />
       <style>
         ${fontFaceDecl}
-        body{font-family:${fontFamily}'Inter','Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;margin:0;padding:30px;background:${colors.bgColor};color:${colors.mainTextColor}}
-        .card{max-width:600px;margin:0 auto;border-radius:20px;overflow:hidden;padding:25px;display:flex;flex-direction:column;gap:20px}
-        .header{text-align:center;border-bottom:2px solid ${colors.separatorColor};padding-bottom:15px}
+        body{font-family:${fontFamily}'Inter','Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;margin:0;padding:10px;background:${colors.bgColor};color:${colors.mainTextColor}}
+        .card{max-width:520px;margin:0 auto;border-radius:20px;overflow:hidden;padding:12px;display:flex;flex-direction:column;gap:8px}
+        .header{text-align:center;border-bottom:2px solid ${colors.separatorColor};padding-bottom:8px}
         .title{font-size:2.2em;font-weight:700;margin:0;color:${colors.primaryColor}}
-        .subtitle{font-size:1.1em;color:${colors.subTextColor};margin-top:5px}
-        .pagination-info{font-size:0.9em;color:${colors.subTextColor};margin-top:5px}
-        .record-item{display:flex;flex-direction:column;gap:8px;padding-bottom:15px;border-bottom:1px solid ${colors.separatorColor}}
+        .subtitle{font-size:1.1em;color:${colors.subTextColor};margin-top:2px}
+        .pagination-info{font-size:0.9em;color:${colors.subTextColor};margin-top:2px}
+        .record-item{display:flex;flex-direction:column;gap:4px;padding-bottom:8px;border-bottom:1px solid ${colors.separatorColor}}
         .record-item:last-child{border-bottom:none;padding-bottom:0}
-        .record-header{display:flex;align-items:center;gap:10px;margin-bottom:5px}
+        .record-header{display:flex;align-items:center;gap:5px;margin-bottom:2px}
         .record-number{font-weight:700;color:${colors.primaryColor};font-size:1.2em}
         .record-date{font-size:0.9em;color:${colors.subTextColor}}
-        .author-info{display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:6px 10px;background:${colors.authorBgColor};border-radius:6px;font-size:0.9em;overflow:hidden}
+        .author-info{display:flex;align-items:center;gap:4px;margin-bottom:3px;padding:3px 8px;background:${colors.authorBgColor};border-radius:6px;font-size:0.9em;overflow:hidden}
         .author-label{color:${colors.subTextColor};font-weight:600;flex-shrink:0}
         .author-name{color:${colors.authorTextColor};font-weight:600;flex-shrink:0}
         .author-nick{color:${colors.authorTextColor};font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
         .author-id{color:${colors.subTextColor};font-family:${fontFamily}monospace;font-size:0.85em;flex-shrink:0}
-        .record-content{font-size:1.1em;line-height:1.6;color:${colors.mainTextColor};margin:0;word-wrap:break-word}
-        .footer{text-align:center;font-size:0.9em;color:${colors.footerTextColor};margin-top:10px}
+        .record-content{font-size:1.1em;line-height:1.3;color:${colors.mainTextColor};margin:0;word-wrap:break-word}
+        .footer{text-align:center;font-size:0.9em;color:${colors.footerTextColor};margin-top:4px}
       </style>
     </head>
     <body>
@@ -179,7 +179,7 @@ async function getWhoAtMeImageHtmlTemplate(ctx: Context, session: any, result: P
   `;
 }
 
-export async function formatWhoAtMeAsImage(ctx: Context, session: any, channelId: string | null, targetUserId: string, page: number, pageSize: number, logger: Logger, textFontPath?: string, renderColors?: RenderColors): Promise<Array<h>> {
+export async function formatWhoAtMeAsImage(ctx: Context, session: any, channelId: string | null, targetUserId: string, page: number, pageSize: number, logger: Logger, textFontPath?: string, renderColors?: RenderColors, imageType?: ImageType, screenshotQuality?: number): Promise<Array<h>> {
   const result = await getAtMentionRecords(ctx, session.platform, targetUserId, channelId, page, pageSize);
 
   if (result.records.length === 0) {
@@ -199,7 +199,7 @@ export async function formatWhoAtMeAsImage(ctx: Context, session: any, channelId
   try {
     const htmlContent = await getWhoAtMeImageHtmlTemplate(ctx, session, result, channelId, textFontPath || '', renderColors || defaultColors);
 
-    await page_puppeteer.setViewport({ width: 700, height: 1 });
+    await page_puppeteer.setViewport({ width: 600, height: 1 });
     await page_puppeteer.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
 
     const cardElement = await page_puppeteer.$('.card');
@@ -209,17 +209,19 @@ export async function formatWhoAtMeAsImage(ctx: Context, session: any, channelId
       throw new Error('无法获取卡片元素的边界框。');
     }
 
+    const shotImageType = imageType || IMAGE_TYPES.PNG;
     const screenshot = await page_puppeteer.screenshot({
-      type: 'png',
+      type: shotImageType,
       encoding: 'base64',
-      clip: boundingBox
+      clip: boundingBox,
+      ...(shotImageType !== IMAGE_TYPES.PNG && { quality: screenshotQuality || 80 })
     });
 
     let res: Array<any> = [];
     res.push(h.quote(session.messageId));
     const scopeText = channelId ? '当前频道' : '全平台';
     res.push(h.text(`${scopeText}第${result.currentPage}/${result.totalPages}页 (共${result.totalCount}条@记录):\n`));
-    res.push(h.image(`data:image/png;base64,${screenshot}`));
+    res.push(h.image(`data:image/${shotImageType};base64,${screenshot}`));
 
     if (result.totalPages > 1) {
       let navText = '';

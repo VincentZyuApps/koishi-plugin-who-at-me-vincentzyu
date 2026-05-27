@@ -1,5 +1,5 @@
 import { Schema } from 'koishi'
-import { MESSSAGE_FORM } from './type'
+import { MESSSAGE_FORM, IMAGE_TYPES, ImageType } from './type'
 
 
 // ==========================================================================
@@ -57,8 +57,12 @@ export interface Config {
   defaultPage: number
   defaultPageSize: number
 
-  // 🖼️ 渲染配置
+  // 🖼️ Puppeteer渲染配置
   textFontPath: string
+  imageType: ImageType
+  screenshotQuality: number
+
+  // 🎨 渲染颜色配置
   renderColors: RenderColors
 
   // 🐛 调试配置
@@ -110,14 +114,34 @@ export const Config = Schema.intersect([
       .min(1).step(1)
       .description('📄 默认查看的页码'),
     defaultPageSize: Schema.number()
-      .default(10)
-      .min(5).max(30).step(1)
-      .description('📏 默认每页显示的记录数（最多 30 条）'),
+      .default(50)
+      .min(5).max(1000).step(1)
+      .description('📏 默认每页显示的记录数（最多 1000 条）'),
+  }).description('📋 指令详细配置'),
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 🖼️ 第三组：Puppeteer 图片渲染配置
+  // ──────────────────────────────────────────────────────────────────────────
+  Schema.object({
     textFontPath: Schema.string()
       .default('G:\\GGames\\Minecraft\\shuyeyun\\qq-bot\\ledao\\koishi-ledao-dev\\external\\awa-quote-image\\assets\\LXGWWenKaiMono-Regular.ttf')
       .role('textarea', { rows: [2, 5] })
       .description('🔤 自定义字体文件路径, 给Puppeteer出图用的（绝对路径，留空则使用系统默认字体）'),
-  }).description('📋 指令详细配置'),
+    imageType: Schema.union([
+      Schema.const(IMAGE_TYPES.PNG).description(`🖼️ ${IMAGE_TYPES.PNG}, ❌ 不支持调整 quality`),
+      Schema.const(IMAGE_TYPES.JPEG).description(`🌄 ${IMAGE_TYPES.JPEG}, ✅ 支持调整 quality`),
+      Schema.const(IMAGE_TYPES.WEBP).description(`🌐 ${IMAGE_TYPES.WEBP}, ✅ 支持调整 quality`),
+    ])
+      .role('radio')
+      .default(IMAGE_TYPES.JPEG)
+      .description('📤 Puppeteer 截图输出格式'),
+    screenshotQuality: Schema
+      .number()
+      .role('slider')
+      .min(0).max(100).step(0.1)
+      .default(50)
+      .description('🎚️ Puppeteer 截图质量 [0-100]，对 PNG 无效'),
+  }).description('🖼️ Puppeteer 图片渲染配置'),
 
   // ──────────────────────────────────────────────────────────────────────────
   // 🎨 第四组：渲染颜色设置
@@ -127,7 +151,7 @@ export const Config = Schema.intersect([
   }).role('table').default({ renderColors: defaultColors }).description('🎨 渲染颜色设置'),
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 🐛 第五组：调试配置
+  // 🐛 第六组：调试配置
   // ──────────────────────────────────────────────────────────────────────────
   Schema.object({
     enableVerboseConsoleLog: Schema.boolean()
