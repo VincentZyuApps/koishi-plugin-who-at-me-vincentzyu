@@ -37,6 +37,9 @@ export const usage = `
 <h2>🎯 功能简介</h2>
 <p>自动监听并记录群聊中的 @ 消息，支持分页查询、三种输出格式、自定义渲染。</p>
 
+<h3>📸 效果预览</h3>
+<p><img src="https://gitee.com/vincent-zyu/koishi-plugin-who-at-me-vincentzyu/releases/download/preview/preview.png" alt="who-at-me 效果预览" width="600"></p>
+
 <h3>📥 数据库监听</h3>
 <ul>
   <li>实时监听群聊消息，自动提取 @ 行为并存入数据库</li>
