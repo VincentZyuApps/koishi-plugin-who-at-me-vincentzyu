@@ -1,70 +1,13 @@
-import { Context, Schema, Session } from 'koishi'
-import { MESSSAGE_FORM } from './type'
+import { Context, h, Session } from 'koishi'
 import { who_at_me } from './command'
+export { Config } from './config'
 
-export const name = 'who-at-me'
+export const name = 'who-at-me-vincentzyu'
 export const inject = {
   required: ["database"],
   optional: ["puppeteer"]
 };
 
-
-export const Config = Schema.intersect([
-
-  Schema.object({
-    enableMiddlewareSaveAtDb: Schema.boolean()
-      .default(false)
-      .description('是否启用中间件监听消息并存入数据库 <br> 只有启用了 才能记录at消息哦~'),
-  }).description('是否 监听at消息并存入数据库 捏？'),
-
-  Schema.union([
-    Schema.object({
-      enableMiddlewareSaveAtDb: Schema.const(true).required(),
-      usePrependMiddleware: Schema.boolean()
-        .default(true)
-        .description('是否使用koishi的前置中间件, <br> 优先级：前置中间件 > 指令 > 普通中间件'),
-    }),
-    Schema.object({})
-  ]),
-
-  
-  Schema.object({
-    enableWhoAtMeCommand: Schema.boolean()
-      .default(false)
-      .description('是否启用 who-at-me 指令'),
-  }).description('是否 谁艾特我指令 捏？'),
-
-  Schema.union([
-    Schema.object({
-      enableWhoAtMeCommand: Schema.const(true).required(),
-      messageForm: Schema.union([
-        Schema.const(MESSSAGE_FORM.TEXT).description('文本消息'),
-        Schema.const(MESSSAGE_FORM.IMAGE).description('图片消息'),
-        Schema.const(MESSSAGE_FORM.FORWARD).description('合并转发消息(目前我已知支持的 好像只有onebot awa)'),
-      ]).role('radio')
-        .description('bot输出 谁艾特我记录的时候 使用的消息格式'),
-      enableTargetUserArg: Schema.boolean()
-        .default(false)
-        .description('是否允许 在参数中 传入 at元素 进行 指定用户的被艾特记录查找'),
-      defaultPage: Schema.number()
-        .default(1)
-        .min(1).step(1)
-        .description('默认查看的页数'),
-      defaultPageSize: Schema.number()
-        .default(10)
-        .min(5).max(30).step(1)
-        .description('默认每页显示的记录数，最多30条'),
-    }),
-    Schema.object({})
-  ]),
-
-  Schema.object({
-    enableVerboseConsoleLog: Schema.boolean()
-      .default(false)
-      .description('是否在控制台打印更多日志， <br> 仅供调试时使用，平时请勿开启'),
-  }).description('调试配置')
-
-])
 
 // 定义第一个数据库表的类型：用于存储消息本体
 declare module 'koishi' {
@@ -178,13 +121,12 @@ export function apply(ctx: Context, config: any) {
     return next();
   }
 
-  // ctx.command('debug')
+  // ctx.command('debug-get-guild-member')
   //   .action( async ( {session, options} ) => {
-
-  //     const userObj = await session.bot.getGuildMember(session.guildId, session.userId);
-  //     userObj.nick
-
-  //   } )
-
+  //     const guildMemberObj = await session?.bot.getGuildMember(session?.guildId, session?.userId);
+  //     const guildMemberStr = `guildMemberObj json: ${JSON.stringify(guildMemberObj)}`;
+  //     ctx.logger.info(guildMemberStr);
+  //     await session?.send(`${h.quote(session.messageId)} ${guildMemberStr}`);
+  //   } );
 
 }
