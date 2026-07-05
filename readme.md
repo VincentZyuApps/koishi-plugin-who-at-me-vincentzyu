@@ -31,7 +31,7 @@
 
 ## 📸 效果预览
 
-![效果预览](doc/image/preview.png)
+![效果预览](doc/image/preview/preview.png)
 
 ## ✨ 功能
 
