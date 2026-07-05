@@ -23,6 +23,7 @@ export function who_at_me(ctx: Context, config: Config) {
   const commandAlias = resolveCommandAlias(config.commandAlias);
 
   const command = ctx.command(`${commandName} [targetUser:text]`, '查询最近谁@了我');
+  command.alias('谁at我')
   if (commandAlias) command.alias(commandAlias);
 
   command
@@ -60,7 +61,7 @@ export function who_at_me(ctx: Context, config: Config) {
         if (config.messageForm === MESSSAGE_FORM.TEXT) {
           whoAtMeMessage = await formatWhoAtMeAsText(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, commandName);
         } else if (config.messageForm === MESSSAGE_FORM.IMAGE) {
-          whoAtMeMessage = await formatWhoAtMeAsImage(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, config.textFontPath, config.renderColors, config.imageType, config.screenshotQuality, config.deviceScaleFactor, commandName);
+          whoAtMeMessage = await formatWhoAtMeAsImage(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, config.textFontPath, config.renderColors, config.imageType, config.screenshotQuality, config.deviceScaleFactor, config.imageFooterText, commandName);
         } else if (config.messageForm === MESSSAGE_FORM.FORWARD) {
           whoAtMeMessage = await formatWhoAtMeAsForward(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, commandName);
         }
