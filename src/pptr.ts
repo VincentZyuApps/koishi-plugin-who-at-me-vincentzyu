@@ -4,6 +4,7 @@ import { } from 'koishi-plugin-puppeteer';
 import { Context, h, Logger } from 'koishi';
 
 import { resolveRuntimeFontPath } from './fonts';
+import { MESSAGE_TABLE, MENTION_TABLE } from './database';
 import { RenderColors, defaultColors } from './config';
 import { AtMentionRecord, PaginatedResult, IMAGE_TYPES, ImageType } from './type';
 
@@ -59,7 +60,7 @@ async function getRecordItemsHtml(ctx: Context, session: any, records: AtMention
 
 export async function getAtMentionRecords(ctx: Context, platform: string, userId: string, channelId: string | null, page: number, pageSize: number): Promise<PaginatedResult> {
   try {
-    const mentionRecords = await ctx.database.get('who_at_me_mentions', {
+    const mentionRecords = await ctx.database.get(MENTION_TABLE, {
       platform: platform,
       mentionedUserId: userId,
       ...( channelId ? { channelId: channelId } : {})
@@ -78,7 +79,7 @@ export async function getAtMentionRecords(ctx: Context, platform: string, userId
     }
 
     const messageIds = mentionRecords.map(record => record.messageId);
-    const messageRecords = await ctx.database.get('who_at_me_messages', {
+    const messageRecords = await ctx.database.get(MESSAGE_TABLE, {
       messageId: { $in: messageIds },
     });
 

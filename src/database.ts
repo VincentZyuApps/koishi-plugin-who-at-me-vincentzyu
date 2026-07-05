@@ -1,8 +1,11 @@
 import { Context, Session } from 'koishi'
 
+export const MESSAGE_TABLE = 'who_at_me_vincentzyu_messages' as const
+export const MENTION_TABLE = 'who_at_me_vincentzyu_mentions' as const
+
 declare module 'koishi' {
   interface Tables {
-    who_at_me_messages: {
+    who_at_me_vincentzyu_messages: {
       id: string
       platform: string
       messageId: string
@@ -10,7 +13,7 @@ declare module 'koishi' {
       content: string
       timestamp: number
     }
-    who_at_me_mentions: {
+    who_at_me_vincentzyu_mentions: {
       id: string
       messageId: string
       platform: string
@@ -22,7 +25,7 @@ declare module 'koishi' {
 }
 
 export function setupDatabase(ctx: Context) {
-  ctx.model.extend('who_at_me_messages', {
+  ctx.model.extend(MESSAGE_TABLE, {
     id: 'string',
     messageId: 'string',
     userId: 'string',
@@ -33,7 +36,7 @@ export function setupDatabase(ctx: Context) {
     primary: 'messageId',
   })
 
-  ctx.model.extend('who_at_me_mentions', {
+  ctx.model.extend(MENTION_TABLE, {
     id: 'string',
     messageId: 'string',
     platform: 'string',
@@ -56,7 +59,7 @@ export function createSaveAtDbMiddleware(ctx: Context, config: any) {
       }
 
       try {
-        await ctx.database.upsert('who_at_me_messages', [{
+        await ctx.database.upsert(MESSAGE_TABLE, [{
           platform,
           messageId,
           userId,
@@ -79,7 +82,7 @@ export function createSaveAtDbMiddleware(ctx: Context, config: any) {
           }
         }
 
-        await ctx.database.upsert('who_at_me_mentions', mentionRecords);
+        await ctx.database.upsert(MENTION_TABLE, mentionRecords);
 
         if (config.enableVerboseConsoleLog)
           ctx.logger.info(`已记录包含 @ 的消息: ${messageId}`);

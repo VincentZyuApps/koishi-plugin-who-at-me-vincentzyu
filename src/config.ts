@@ -134,7 +134,7 @@ export const Config = Schema.intersect([
       .description('🔤 自定义字体文件路径, 给 Puppeteer 出图用（留空/默认值会自动使用 ctx.baseDir/data/fonts/LXGWWenKaiMono-Regular.ttf）'),
     deviceScaleFactor: Schema
       .number()
-      .role('slider')
+      .role('')
       .min(0.5).max(5).step(0.1)
       .default(2.5)
       .description('🔍 Puppeteer 截图设备像素比，数值越高越清晰但图片体积越大'),

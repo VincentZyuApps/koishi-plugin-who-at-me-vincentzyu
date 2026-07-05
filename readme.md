@@ -5,7 +5,7 @@
 📬 谁艾特我：自动监听并记录群聊中的 @ 消息，支持分页查询、三种输出格式、自定义渲染。
 
 [![npm](https://img.shields.io/npm/v/koishi-plugin-who-at-me-vincentzyu?style=flat-square&logo=npm)](https://www.npmjs.com/package/koishi-plugin-who-at-me-vincentzyu)
-[![npm-download](https://img.shields.io/npm/dm/koishi-plugin-who-at-me-vincentzyu?style=flat-square&logo=npm)](https://www.npmjs.com/package/koishi-plugin-who-at-me-vincentzyu)
+[![npm-download](https://img.shields.io/npm/dm/koishi-plugin-who-at-me-vincentzyu?style=flat-square&logo=npm)](https://npm-stat.com/charts.html?package=koishi-plugin-who-at-me-vincentzyu)
 
 [![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/VincentZyuApps/koishi-plugin-who-at-me-vincentzyu)
 [![Gitee](https://img.shields.io/badge/Gitee-C71D23?style=for-the-badge&logo=gitee&logoColor=white)](https://gitee.com/vincent-zyu/koishi-plugin-who-at-me-vincentzyu)
