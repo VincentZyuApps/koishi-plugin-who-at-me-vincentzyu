@@ -1,12 +1,31 @@
-import { Context, h, Logger } from "koishi";
-import { ELEMENT_TYPE_MAP, MESSSAGE_FORM, AtMentionRecord, PaginatedResult } from "./type";
-import { formatWhoAtMeAsImage, parseMessageContent, getAtMentionRecords } from "./render-pptr";
+import { Context, h, Logger } from 'koishi'
 
-export function who_at_me(ctx: Context, config: any) {
+import type { Config } from './config'
+import { MESSSAGE_FORM } from './type'
+import { getAtMentionRecords, parseMessageContent, formatWhoAtMeAsImage } from './pptr'
+
+const DEFAULT_COMMAND_NAME = 'who-at-me';
+const DEFAULT_COMMAND_ALIAS = '谁艾特我';
+
+function resolveCommandName(value: unknown): string {
+  if (typeof value !== 'string') return DEFAULT_COMMAND_NAME;
+  return value.trim() || DEFAULT_COMMAND_NAME;
+}
+
+function resolveCommandAlias(value: unknown): string {
+  if (typeof value !== 'string') return DEFAULT_COMMAND_ALIAS;
+  return value.trim();
+}
+
+export function who_at_me(ctx: Context, config: Config) {
   const whoAtMeLogger = new Logger('who-at-me-command');
+  const commandName = resolveCommandName(config.commandName);
+  const commandAlias = resolveCommandAlias(config.commandAlias);
 
-  ctx.command('who-at-me [targetUser:text]', '查询最近谁@了我')
-    .alias('谁艾特我')
+  const command = ctx.command(`${commandName} [targetUser:text]`, '查询最近谁@了我');
+  if (commandAlias) command.alias(commandAlias);
+
+  command
     .option('page', '-p, --page <page:number> 页码，从1开始', { fallback: config.defaultPage || 1 })
     .option('pagesize', '-s, --pagesize <pagesize:number> 每页显示条数', { fallback: config.defaultPageSize || 10 })
     .option('only_this_channel', '-o, --only-this-channel <only_this_channel:string> true:当前频道, false:全平台', { fallback: true })
@@ -39,11 +58,11 @@ export function who_at_me(ctx: Context, config: any) {
         let whoAtMeMessage;
 
         if (config.messageForm === MESSSAGE_FORM.TEXT) {
-          whoAtMeMessage = await formatWhoAtMeAsText(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger);
+          whoAtMeMessage = await formatWhoAtMeAsText(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, commandName);
         } else if (config.messageForm === MESSSAGE_FORM.IMAGE) {
-          whoAtMeMessage = await formatWhoAtMeAsImage(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, config.textFontPath, config.renderColors, config.imageType, config.screenshotQuality);
+          whoAtMeMessage = await formatWhoAtMeAsImage(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, config.textFontPath, config.renderColors, config.imageType, config.screenshotQuality, config.deviceScaleFactor, commandName);
         } else if (config.messageForm === MESSSAGE_FORM.FORWARD) {
-          whoAtMeMessage = await formatWhoAtMeAsForward(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger);
+          whoAtMeMessage = await formatWhoAtMeAsForward(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, commandName);
         }
 
         await session.send(whoAtMeMessage);
@@ -86,7 +105,7 @@ export function getUserIdFromStr(input: string): string | null {
 }
 
 
-async function formatWhoAtMeAsText(ctx: Context, session: any, channelId: string | null, targetUserId: string, page: number, pageSize: number, logger: Logger): Promise<Array<h>> {
+async function formatWhoAtMeAsText(ctx: Context, session: any, channelId: string | null, targetUserId: string, page: number, pageSize: number, logger: Logger, commandName = DEFAULT_COMMAND_NAME): Promise<Array<h>> {
   const result = await getAtMentionRecords(ctx, session.platform, targetUserId, channelId, page, pageSize);
 
   if (result.records.length === 0) {
@@ -122,17 +141,17 @@ async function formatWhoAtMeAsText(ctx: Context, session: any, channelId: string
     res.push( h.text(`------------------\n`) );
     const onlyChannelFlag = channelId ? '' : ' --no-only-this-channel';
     if (result.hasPrev) {
-      res.push( h.text(`上一页: who-at-me -p ${result.currentPage - 1} -s ${result.pageSize}${onlyChannelFlag}\n`) );
+      res.push( h.text(`上一页: ${commandName} -p ${result.currentPage - 1} -s ${result.pageSize}${onlyChannelFlag}\n`) );
     }
     if (result.hasNext) {
-      res.push( h.text(`下一页: who-at-me -p ${result.currentPage + 1} -s ${result.pageSize}${onlyChannelFlag}\n`) );
+      res.push( h.text(`下一页: ${commandName} -p ${result.currentPage + 1} -s ${result.pageSize}${onlyChannelFlag}\n`) );
     }
   }
 
   return res;
 }
 
-async function formatWhoAtMeAsForward(ctx: Context, session: any, channelId: string | null, targetUserId: string, page: number, pageSize: number, logger: Logger): Promise<string> {
+async function formatWhoAtMeAsForward(ctx: Context, session: any, channelId: string | null, targetUserId: string, page: number, pageSize: number, logger: Logger, commandName = DEFAULT_COMMAND_NAME): Promise<string> {
   const result = await getAtMentionRecords(ctx, session.platform, targetUserId, channelId, page, pageSize);
 
   if (result.records.length === 0) {
@@ -189,10 +208,10 @@ async function formatWhoAtMeAsForward(ctx: Context, session: any, channelId: str
     let navText = '';
     const onlyChannelFlag = channelId ? '' : ' --no-only-this-channel';
     if (result.hasPrev) {
-      navText += `上一页: who-at-me -p ${result.currentPage - 1} -s ${result.pageSize}${onlyChannelFlag}\n`;
+      navText += `上一页: ${commandName} -p ${result.currentPage - 1} -s ${result.pageSize}${onlyChannelFlag}\n`;
     }
     if (result.hasNext) {
-      navText += `下一页: who-at-me -p ${result.currentPage + 1} -s ${result.pageSize}${onlyChannelFlag}`;
+      navText += `下一页: ${commandName} -p ${result.currentPage + 1} -s ${result.pageSize}${onlyChannelFlag}`;
     }
     if (navText) {
       await addMessageBlock(undefined, '分页导航', navText);

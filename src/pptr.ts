@@ -1,9 +1,11 @@
-import { Context, h, Logger } from "koishi";
-import { } from 'koishi-plugin-puppeteer';
-import { AtMentionRecord, PaginatedResult, IMAGE_TYPES, ImageType } from "./type";
-import { RenderColors, defaultColors } from "./config";
 import fs from 'fs';
-import path from 'path';
+
+import { } from 'koishi-plugin-puppeteer';
+import { Context, h, Logger } from 'koishi';
+
+import { resolveRuntimeFontPath } from './fonts';
+import { RenderColors, defaultColors } from './config';
+import { AtMentionRecord, PaginatedResult, IMAGE_TYPES, ImageType } from './type';
 
 export async function parseMessageContent(ctx: Context, session: any, content: string): Promise<any> {
   const elements = h.parse(content);
@@ -110,29 +112,52 @@ export async function getAtMentionRecords(ctx: Context, platform: string, userId
   }
 }
 
-function loadFontBase64(fontPath: string): { fontBase64: string; fontName: string } {
-  const result = { fontBase64: '', fontName: 'Inter' };
-  if (!fontPath) return result;
+function loadFontBase64(logger: Logger, fontPath: string | null): string {
+  if (!fontPath) return '';
   try {
     if (fs.existsSync(fontPath)) {
       const fontBuffer = fs.readFileSync(fontPath);
-      result.fontBase64 = fontBuffer.toString('base64');
-      result.fontName = path.basename(fontPath, path.extname(fontPath));
+      return fontBuffer.toString('base64');
     }
+    logger.warn(`⚠️ 字体文件不存在，将使用系统字体: ${fontPath}`);
   } catch (e) {
-    console.error('读取字体文件失败:', e, '路径:', fontPath);
+    logger.warn(`⚠️ 读取字体文件失败，将使用系统字体: ${fontPath}, error=${e?.message || e}`);
   }
-  return result;
+  return '';
 }
 
-async function getWhoAtMeImageHtmlTemplate(ctx: Context, session: any, result: PaginatedResult, channelId: string | null, textFontPath: string, colors: RenderColors): Promise<string> {
+async function waitForFontsAndStableLayout(browserPage: any, selector: string) {
+  await browserPage.evaluate(async (targetSelector: string) => {
+    const fonts = (document as any).fonts;
+    if (fonts?.ready) await fonts.ready;
+
+    const element = document.querySelector(targetSelector);
+    if (!element) return;
+
+    let previous = '';
+    let stableFrames = 0;
+    for (let i = 0; i < 10 && stableFrames < 2; i++) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const rect = element.getBoundingClientRect();
+      const current = [rect.x, rect.y, rect.width, rect.height, document.body.scrollWidth, document.body.scrollHeight].join(',');
+      if (current === previous) {
+        stableFrames++;
+      } else {
+        stableFrames = 0;
+        previous = current;
+      }
+    }
+  }, selector);
+}
+
+async function getWhoAtMeImageHtmlTemplate(ctx: Context, session: any, result: PaginatedResult, channelId: string | null, textFontPath: string | null, colors: RenderColors, logger: Logger): Promise<string> {
   const scopeText = channelId ? '当前频道' : '全平台';
 
-  const { fontBase64, fontName } = loadFontBase64(textFontPath);
+  const fontBase64 = loadFontBase64(logger, textFontPath);
   const fontFaceDecl = fontBase64
-    ? `@font-face{font-family:'${fontName}';src:url('data:font/truetype;charset=utf-8;base64,${fontBase64}') format('truetype');font-weight:normal;font-style:normal;font-display:swap;}`
+    ? `@font-face{font-family:'CustomFont';src:url('data:font/truetype;charset=utf-8;base64,${fontBase64}') format('truetype');font-weight:normal;font-style:normal;font-display:block;}`
     : '';
-  const fontFamily = fontBase64 ? `'${fontName}',` : '';
+  const fontFamily = fontBase64 ? `'CustomFont',` : '';
 
   return `
     <html>
@@ -179,7 +204,7 @@ async function getWhoAtMeImageHtmlTemplate(ctx: Context, session: any, result: P
   `;
 }
 
-export async function formatWhoAtMeAsImage(ctx: Context, session: any, channelId: string | null, targetUserId: string, page: number, pageSize: number, logger: Logger, textFontPath?: string, renderColors?: RenderColors, imageType?: ImageType, screenshotQuality?: number): Promise<Array<h>> {
+export async function formatWhoAtMeAsImage(ctx: Context, session: any, channelId: string | null, targetUserId: string, page: number, pageSize: number, logger: Logger, textFontPath?: string, renderColors?: RenderColors, imageType?: ImageType, screenshotQuality?: number, deviceScaleFactor?: number, commandName = 'who-at-me'): Promise<Array<h>> {
   const result = await getAtMentionRecords(ctx, session.platform, targetUserId, channelId, page, pageSize);
 
   if (result.records.length === 0) {
@@ -197,10 +222,14 @@ export async function formatWhoAtMeAsImage(ctx: Context, session: any, channelId
 
   const page_puppeteer = await ctx.puppeteer.page();
   try {
-    const htmlContent = await getWhoAtMeImageHtmlTemplate(ctx, session, result, channelId, textFontPath || '', renderColors || defaultColors);
+    const runtimeFontPath = await resolveRuntimeFontPath(ctx, logger, textFontPath);
+    const htmlContent = await getWhoAtMeImageHtmlTemplate(ctx, session, result, channelId, runtimeFontPath, renderColors || defaultColors, logger);
+    const resolvedDeviceScaleFactor = Math.max(0.5, Math.min(5, Number(deviceScaleFactor) || 2.5));
 
-    await page_puppeteer.setViewport({ width: 600, height: 1 });
-    await page_puppeteer.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
+    await page_puppeteer.setViewport({ width: 600, height: 1, deviceScaleFactor: resolvedDeviceScaleFactor });
+    await page_puppeteer.setContent(htmlContent, { waitUntil: 'load' });
+    await page_puppeteer.waitForSelector('.card', { timeout: 5000 });
+    await waitForFontsAndStableLayout(page_puppeteer, '.card');
 
     const cardElement = await page_puppeteer.$('.card');
     const boundingBox = await cardElement?.boundingBox();
@@ -227,10 +256,10 @@ export async function formatWhoAtMeAsImage(ctx: Context, session: any, channelId
       let navText = '';
       const onlyChannelFlag = channelId ? '' : ' --no-only-this-channel';
       if (result.hasPrev) {
-        navText += `上一页: who-at-me -p ${result.currentPage - 1} -s ${result.pageSize}${onlyChannelFlag}\n`;
+        navText += `上一页: ${commandName} -p ${result.currentPage - 1} -s ${result.pageSize}${onlyChannelFlag}\n`;
       }
       if (result.hasNext) {
-        navText += `下一页: who-at-me -p ${result.currentPage + 1} -s ${result.pageSize}${onlyChannelFlag}`;
+        navText += `下一页: ${commandName} -p ${result.currentPage + 1} -s ${result.pageSize}${onlyChannelFlag}`;
       }
       if (navText) {
         res.push(h.text(navText));

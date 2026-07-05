@@ -1,5 +1,7 @@
 import { Schema } from 'koishi'
-import { MESSSAGE_FORM, IMAGE_TYPES, ImageType } from './type'
+
+import { DEFAULT_LXGW_WENKAI_PATH } from './fonts'
+import { IMAGE_TYPES, ImageType, MESSSAGE_FORM } from './type'
 
 
 // ==========================================================================
@@ -52,6 +54,8 @@ export interface Config {
 
   // 🎯 指令配置
   enableWhoAtMeCommand: boolean
+  commandName: string
+  commandAlias: string
   messageForm: 'text' | 'image' | 'forward'
   enableTargetUserArg: boolean
   defaultPage: number
@@ -59,6 +63,7 @@ export interface Config {
 
   // 🖼️ Puppeteer渲染配置
   textFontPath: string
+  deviceScaleFactor: number
   imageType: ImageType
   screenshotQuality: number
 
@@ -76,28 +81,27 @@ export const Config = Schema.intersect([
   // ──────────────────────────────────────────────────────────────────────────
   Schema.object({
     enableMiddlewareSaveAtDb: Schema.boolean()
-      .default(false)
+      .default(true)
       .description('✅ 启用中间件监听消息并存入数据库<br>💡 只有启用了，才能记录 @ 消息哦~'),
-  }).description('📥 是否监听 @ 消息并存入数据库 捏？'),
-
-  Schema.union([
-    Schema.object({
-      enableMiddlewareSaveAtDb: Schema.const(true).required(),
-      usePrependMiddleware: Schema.boolean()
+    usePrependMiddleware: Schema.boolean()
         .default(true)
         .description('🔄 是否使用 koishi 的前置中间件<br>📌 优先级：前置中间件 > 指令 > 普通中间件'),
-    }),
-    Schema.object({})
-  ]),
+  }).description('📥 中间件设置'),
 
   // ──────────────────────────────────────────────────────────────────────────
   // 🎯 第二组：who-at-me 指令配置
   // ──────────────────────────────────────────────────────────────────────────
   Schema.object({
     enableWhoAtMeCommand: Schema.boolean()
-      .default(false)
+      .default(true)
       .description('🔘 是否启用 who-at-me 指令'),
-  }).description('🎯 是否启用「谁艾特我」指令 捏？'),
+    commandName: Schema.string()
+      .default('who-at-me')
+      .description('⌨️ who-at-me 主指令名'),
+    commandAlias: Schema.string()
+      .default('谁艾特我')
+      .description('🏷️ who-at-me 指令别名，留空则不注册别名'),
+  }).description('🎯 指令设置'),
 
   Schema.object({
     messageForm: Schema.union([
@@ -105,6 +109,7 @@ export const Config = Schema.intersect([
       Schema.const(MESSSAGE_FORM.IMAGE).description('🖼️ 图片消息（使用 Puppeteer 渲染）'),
       Schema.const(MESSSAGE_FORM.FORWARD).description('📎 合并转发消息 (⚠️仅支持onebot)'),
     ]).role('radio')
+      .default(MESSSAGE_FORM.IMAGE)
       .description('📤 Bot 输出「谁艾特我」记录时使用的消息格式'),
     enableTargetUserArg: Schema.boolean()
       .default(true)
@@ -124,22 +129,28 @@ export const Config = Schema.intersect([
   // ──────────────────────────────────────────────────────────────────────────
   Schema.object({
     textFontPath: Schema.string()
-      .default('G:\\GGames\\Minecraft\\shuyeyun\\qq-bot\\ledao\\koishi-ledao-dev\\external\\awa-quote-image\\assets\\LXGWWenKaiMono-Regular.ttf')
+      .default(DEFAULT_LXGW_WENKAI_PATH)
       .role('textarea', { rows: [2, 5] })
-      .description('🔤 自定义字体文件路径, 给Puppeteer出图用的（绝对路径，留空则使用系统默认字体）'),
+      .description('🔤 自定义字体文件路径, 给 Puppeteer 出图用（留空/默认值会自动使用 ctx.baseDir/data/fonts/LXGWWenKaiMono-Regular.ttf）'),
+    deviceScaleFactor: Schema
+      .number()
+      .role('slider')
+      .min(0.5).max(5).step(0.1)
+      .default(2.5)
+      .description('🔍 Puppeteer 截图设备像素比，数值越高越清晰但图片体积越大'),
     imageType: Schema.union([
       Schema.const(IMAGE_TYPES.PNG).description(`🖼️ ${IMAGE_TYPES.PNG}, ❌ 不支持调整 quality`),
       Schema.const(IMAGE_TYPES.JPEG).description(`🌄 ${IMAGE_TYPES.JPEG}, ✅ 支持调整 quality`),
       Schema.const(IMAGE_TYPES.WEBP).description(`🌐 ${IMAGE_TYPES.WEBP}, ✅ 支持调整 quality`),
     ])
       .role('radio')
-      .default(IMAGE_TYPES.JPEG)
+      .default(IMAGE_TYPES.PNG)
       .description('📤 Puppeteer 截图输出格式'),
     screenshotQuality: Schema
       .number()
       .role('slider')
       .min(0).max(100).step(0.1)
-      .default(50)
+      .default(80)
       .description('🎚️ Puppeteer 截图质量 [0-100]，对 PNG 无效'),
   }).description('🖼️ Puppeteer 图片渲染配置'),
 

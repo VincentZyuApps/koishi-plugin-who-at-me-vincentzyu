@@ -4,15 +4,17 @@
 
 📬 谁艾特我：自动监听并记录群聊中的 @ 消息，支持分页查询、三种输出格式、自定义渲染。
 
-[![npm](https://img.shields.io/npm/v/koishi-plugin-who-at-me-vincentzyu?style=flat-square)](https://www.npmjs.com/package/koishi-plugin-who-at-me-vincentzyu)
-[![npm-download](https://img.shields.io/npm/dm/koishi-plugin-who-at-me-vincentzyu?style=flat-square)](https://www.npmjs.com/package/koishi-plugin-who-at-me-vincentzyu)
+[![npm](https://img.shields.io/npm/v/koishi-plugin-who-at-me-vincentzyu?style=flat-square&logo=npm)](https://www.npmjs.com/package/koishi-plugin-who-at-me-vincentzyu)
+[![npm-download](https://img.shields.io/npm/dm/koishi-plugin-who-at-me-vincentzyu?style=flat-square&logo=npm)](https://www.npmjs.com/package/koishi-plugin-who-at-me-vincentzyu)
 
 [![GitHub](https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/VincentZyuApps/koishi-plugin-who-at-me-vincentzyu)
 [![Gitee](https://img.shields.io/badge/Gitee-C71D23?style=for-the-badge&logo=gitee&logoColor=white)](https://gitee.com/vincent-zyu/koishi-plugin-who-at-me-vincentzyu)
 
-[![QQ群](https://img.shields.io/badge/QQ群-1085190201-1AAD19?style=flat-square)](https://qm.qq.com/q/ZN7fxZ3qCq)
-[![Koishi Forum](https://img.shields.io/badge/koishi.forum.xyz_topic_12566-5546A3?style=for-the-badge&logo=https%3A%2F%2Fupload.wikimedia.org%2Fwikipedia%2Fcommons%2Ff%2Ff3%2FKoishi.js_Logo.png&logoColor=white)](https://forum.koishi.xyz/t/topic/12566)
+[![Koishi Forum](https://img.shields.io/badge/Koishi%20Forum-12566-5546A3?style=for-the-badge&logo=data%3Aimage%2Fpng%3Bbase64%2CiVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAABU0lEQVR42p2UQSsFYRSGnxnqLuytKWKpKFkQNsS%2FsOHPWPADLCmxU5S7UzYWNrJR7lYiRF2FeWzOMKZ7mXHqNNP5vvP2nu%2B850CY2lP4X1K31ZbaDm%2BpO%2Bpyp5wfAXVEPfRvO1JHf4AVQGbUh7j4EZ4VkrNCXPVRnf3CUBN1SH2KC28VGOV3ntRhNclZHdcAKYM11QR1oVBOXctzFlNgBTC8qmXxPQEegbVeYApIgJT6tg%2F0AdMp0B%2FBpCabK2AAmAAa%2F2GRBft1oBFPkqTAba7LCiAfQC9wClwAY1HJHepuiO29Yrsf1Dn1uiDU3RTYCtTkl1Leg8k9MB4NGgReI28rV3azgyCz0og01Xl1Uz1QX8uCTELm3UbkTF1VJ9Wr0tn3iBSGdjYG0XivE3VN3VD31PM4a3cc2tIGGI0VkTO7rLxGuiy25ejmjfqsvkSXui62TxaK03td4FXTAAAAAElFTkSuQmCC&logoColor=white)](https://forum.koishi.xyz/t/topic/12566)
+[![QQ群](https://img.shields.io/badge/QQ群-1085190201-12B7F5?style=flat-square&logo=qq&logoColor=white)](https://qm.qq.com/q/ZN7fxZ3qCq)
 
+<h2>💬 交流反馈</h2>
+<p>🐛 Bug 反馈 / 💡 建议 / 👨‍💻 插件开发交流，欢迎加群：</p>
 <p><del>💬 插件使用问题 / 🐛 Bug反馈 / 👨‍💻 插件开发交流，欢迎加入QQ群：<b>259248174</b>   🎉（这个群G了）</del></p> 
 <p>💬 插件使用问题 / 🐛 Bug反馈 / 👨‍💻 插件开发交流，欢迎加入QQ群：<b>1085190201</b> 🎉</p>
 <p>💡 在群里直接艾特我，回复的更快哦~ ✨</p>
@@ -87,8 +89,10 @@ yarn add koishi-plugin-who-at-me-vincentzyu
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `enableWhoAtMeCommand` | `false` | 启用 who-at-me 指令 |
-| `messageForm` | `'text'` | 输出格式：`text` 文本 / `image` 图片 / `forward` 合并转发 |
+| `enableWhoAtMeCommand` | `true` | 启用 who-at-me 指令 |
+| `commandName` | `'who-at-me'` | who-at-me 主指令名 |
+| `commandAlias` | `'谁艾特我'` | who-at-me 指令别名，留空则不注册别名 |
+| `messageForm` | `'image'` | 输出格式：`text` 文本 / `image` 图片 / `forward` 合并转发 |
 | `enableTargetUserArg` | `false` | 允许在参数中传入 @ 元素查询指定用户记录 |
 | `defaultPage` | `1` | 默认查看页码 |
 | `defaultPageSize` | `10` | 默认每页记录数（最多 30 条） |
@@ -98,6 +102,7 @@ yarn add koishi-plugin-who-at-me-vincentzyu
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
 | `textFontPath` | `(空)` | 自定义字体文件绝对路径，留空使用默认字体 |
+| `deviceScaleFactor` | `2.5` | Puppeteer 截图设备像素比，越高越清晰但图片体积越大 |
 | `imageType` | `'png'` | 截图输出格式：`png` / `jpeg` / `webp` |
 | `screenshotQuality` | `80` | 截图质量 [0-100]，仅对 jpeg/webp 生效 |
 
