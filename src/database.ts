@@ -1,5 +1,8 @@
 import { Context, Session } from 'koishi'
 
+// Koishi 4.18's Minato types do not yet represent the runtime PostgreSQL bigint type.
+const postgresBigint = 'bigint' as any
+
 export const MESSAGE_TABLE = 'who_at_me_vincentzyu_messages' as const
 export const MENTION_TABLE = 'who_at_me_vincentzyu_mentions' as const
 
@@ -30,8 +33,8 @@ export function setupDatabase(ctx: Context) {
     messageId: 'string',
     userId: 'string',
     platform: 'string',
-    content: 'string',
-    timestamp: 'integer',
+    content: 'text',
+    timestamp: postgresBigint,
   }, {
     primary: 'messageId',
   })
