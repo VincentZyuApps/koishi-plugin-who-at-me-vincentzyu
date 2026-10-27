@@ -125,7 +125,7 @@ async function formatWhoAtMeAsText(ctx: Context, session: any, channelId: string
 
   for (let i = 0; i < result.records.length; i++) {
     const record = result.records[i];
-    const date = new Date(record.timestamp).toLocaleString('zh-CN');
+    const date = new Date(Number(record.timestamp)).toLocaleString('zh-CN');
     const globalIndex = (result.currentPage - 1) * result.pageSize + i + 1;
 
     const authorUserObj = await session.bot.getGuildMember(session.guildId, record.userId);
@@ -186,7 +186,7 @@ async function formatWhoAtMeAsForward(ctx: Context, session: any, channelId: str
   // Subsequent messages: Each @mention record
   for (let i = 0; i < result.records.length; i++) {
     const record = result.records[i];
-    const date = new Date(record.timestamp).toLocaleString('zh-CN');
+    const date = new Date(Number(record.timestamp)).toLocaleString('zh-CN');
     const globalIndex = (result.currentPage - 1) * result.pageSize + i + 1;
 
     const authorUserObj = await session.bot.getGuildMember(session.guildId, record.userId);

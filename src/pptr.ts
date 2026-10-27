@@ -30,7 +30,7 @@ export async function parseMessageContent(ctx: Context, session: any, content: s
 
 async function getRecordItemsHtml(ctx: Context, session: any, records: AtMentionRecord[], currentPage: number, pageSize: number): Promise<string> {
   const htmlPromises = records.map(async (record, index) => {
-    const date = new Date(record.timestamp).toLocaleString('zh-CN');
+    const date = new Date(Number(record.timestamp)).toLocaleString('zh-CN');
     const globalIndex = (currentPage - 1) * pageSize + index + 1;
     
     const authorUserObj = await session.bot.getGuildMember(session.guildId, record.userId);
@@ -88,10 +88,10 @@ export async function getAtMentionRecords(ctx: Context, platform: string, userId
         messageId: message.messageId,
         userId: message.userId,
         content: message.content,
-        timestamp: message.timestamp,
+        timestamp: Number(message.timestamp),
         platform: message.platform,
       }))
-      .sort((a, b) => b.timestamp - a.timestamp);
+      .sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
 
     const totalCount = allRecords.length;
     const totalPages = Math.ceil(totalCount / pageSize);

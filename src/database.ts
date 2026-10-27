@@ -14,7 +14,7 @@ declare module 'koishi' {
       messageId: string
       userId: string
       content: string
-      timestamp: number
+      timestamp: number | bigint
     }
     who_at_me_vincentzyu_mentions: {
       id: string
