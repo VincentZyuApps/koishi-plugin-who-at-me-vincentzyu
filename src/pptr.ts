@@ -5,10 +5,11 @@ import { Context, h, Logger } from 'koishi';
 
 import { resolveRuntimeFontPath } from './fonts';
 import { MESSAGE_TABLE, MENTION_TABLE } from './database';
-import { DEFAULT_IMAGE_FOOTER_TEXT, RenderColors, defaultColors } from './config';
+import { DEFAULT_IMAGE_FOOTER_TEXT, RenderColors, defaultColors, GuildMemberCacheMode } from './config';
 import { AtMentionRecord, PaginatedResult, IMAGE_TYPES, ImageType } from './type';
+import { getGuildMemberSafe } from './member';
 
-export async function parseMessageContent(ctx: Context, session: any, content: string): Promise<any> {
+export async function parseMessageContent(ctx: Context, session: any, content: string, cacheMode: GuildMemberCacheMode = 'ttl', logger?: Logger): Promise<any> {
   const elements = h.parse(content);
 
   let resArr = []
@@ -17,9 +18,8 @@ export async function parseMessageContent(ctx: Context, session: any, content: s
     if (e.type === 'text') {
       resArr.push(e.attrs.content);
     } else if (e.type === 'at') {
-      const userObj = await session.bot.getGuildMember(session.guildId, e.attrs.id);
-      console.log(`userObj = ${JSON.stringify(userObj)}`);
-      resArr.push(`@${userObj.nick ? userObj.nick : userObj.user.name}`);
+      const userObj = await getGuildMemberSafe(session, session.guildId, e.attrs.id, cacheMode, logger);
+      resArr.push(`@${userObj.nick ? userObj.nick : userObj.name}`);
     }
     else {
       resArr.push(`[${e.type}]`);
@@ -28,15 +28,16 @@ export async function parseMessageContent(ctx: Context, session: any, content: s
   return (resArr);
 }
 
-async function getRecordItemsHtml(ctx: Context, session: any, records: AtMentionRecord[], currentPage: number, pageSize: number): Promise<string> {
+async function getRecordItemsHtml(ctx: Context, session: any, records: AtMentionRecord[], currentPage: number, pageSize: number, cacheMode: GuildMemberCacheMode = 'ttl', logger?: Logger): Promise<string> {
   const htmlPromises = records.map(async (record, index) => {
     const date = new Date(Number(record.timestamp)).toLocaleString('zh-CN');
     const globalIndex = (currentPage - 1) * pageSize + index + 1;
     
-    const authorUserObj = await session.bot.getGuildMember(session.guildId, record.userId);
-    const authorName = authorUserObj.user.name;
+    const authorUserObj = await getGuildMemberSafe(session, session.guildId, record.userId, cacheMode, logger);
+    const authorName = authorUserObj.name;
     const authorNick = authorUserObj.nick;
-    const authorUserId = authorUserObj.user.userId;
+    const authorUserId = authorUserObj.userId;
+    const isFallback = authorUserObj.isFallback;
     
     return `
       <div class="record-item">
@@ -44,13 +45,14 @@ async function getRecordItemsHtml(ctx: Context, session: any, records: AtMention
           <span class="record-number">${globalIndex}.</span>
           <span class="record-date">[${date}]</span>
         </div>
-        <div class="author-info">
+        <div class="author-info ${isFallback ? 'fallback' : ''}">
           <span class="author-label">消息作者:</span>
-          <span class="author-name">${authorName}</span>
-          <span class="author-id">(${authorUserId})</span>
-          ${authorNick ? `<span class="author-nick">(${authorNick})</span>` : ''}
+          <span class="author-name">${escapeHtml(authorName)}</span>
+          <span class="author-id">(${escapeHtml(authorUserId)})</span>
+          ${authorNick ? `<span class="author-nick">(${escapeHtml(authorNick)})</span>` : ''}
+          ${isFallback ? `<span class="fallback-badge">未在群内</span>` : ''}
         </div>
-        <p class="record-content">${(await parseMessageContent(ctx, session, record.content)).join('')}</p>
+        <p class="record-content">${(await parseMessageContent(ctx, session, record.content, cacheMode, logger)).join('')}</p>
       </div>
     `;
   });
@@ -160,7 +162,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-async function getWhoAtMeImageHtmlTemplate(ctx: Context, session: any, result: PaginatedResult, channelId: string | null, textFontPath: string | null, colors: RenderColors, logger: Logger, imageFooterText = DEFAULT_IMAGE_FOOTER_TEXT): Promise<string> {
+async function getWhoAtMeImageHtmlTemplate(ctx: Context, session: any, result: PaginatedResult, channelId: string | null, textFontPath: string | null, colors: RenderColors, logger: Logger, imageFooterText = DEFAULT_IMAGE_FOOTER_TEXT, cacheMode: GuildMemberCacheMode = 'ttl'): Promise<string> {
   const scopeText = channelId ? '当前频道' : '全平台';
   const footerText = escapeHtml(imageFooterText);
 
@@ -188,10 +190,13 @@ async function getWhoAtMeImageHtmlTemplate(ctx: Context, session: any, result: P
         .record-number{font-weight:700;color:${colors.primaryColor};font-size:1.2em}
         .record-date{font-size:0.9em;color:${colors.subTextColor}}
         .author-info{display:flex;align-items:center;gap:4px;margin-bottom:3px;padding:3px 8px;background:${colors.authorBgColor};border-radius:6px;font-size:0.9em;overflow:hidden}
+        .author-info.fallback{background:${colors.fallbackAuthorBgColor};border:1px solid ${colors.fallbackAuthorTextColor}33}
+        .author-info.fallback .author-name{color:${colors.fallbackAuthorTextColor}}
         .author-label{color:${colors.subTextColor};font-weight:600;flex-shrink:0}
         .author-name{color:${colors.authorTextColor};font-weight:600;flex-shrink:0}
         .author-nick{color:${colors.authorTextColor};font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
         .author-id{color:${colors.subTextColor};font-family:${fontFamily}monospace;font-size:0.85em;flex-shrink:0}
+        .fallback-badge{font-size:0.75em;padding:1px 5px;border-radius:4px;background:${colors.fallbackAuthorTextColor};color:#ffffff;font-weight:600;margin-left:4px;flex-shrink:0}
         .record-content{font-size:1.1em;line-height:1.3;color:${colors.mainTextColor};margin:0;word-wrap:break-word}
         .footer{text-align:center;font-size:0.9em;color:${colors.footerTextColor};margin-top:4px}
       </style>
@@ -204,7 +209,7 @@ async function getWhoAtMeImageHtmlTemplate(ctx: Context, session: any, result: P
           <div class="pagination-info">第${result.currentPage}/${result.totalPages}页 (共${result.totalCount}条记录)</div>
         </div>
         <div class="record-list">
-          ${await getRecordItemsHtml(ctx, session, result.records, result.currentPage, result.pageSize)}
+          ${await getRecordItemsHtml(ctx, session, result.records, result.currentPage, result.pageSize, cacheMode, logger)}
         </div>
         <div class="footer">
           ${footerText}
@@ -215,7 +220,7 @@ async function getWhoAtMeImageHtmlTemplate(ctx: Context, session: any, result: P
   `;
 }
 
-export async function formatWhoAtMeAsImage(ctx: Context, session: any, channelId: string | null, targetUserId: string, page: number, pageSize: number, logger: Logger, textFontPath?: string, renderColors?: RenderColors, imageType?: ImageType, screenshotQuality?: number, deviceScaleFactor?: number, imageFooterText = DEFAULT_IMAGE_FOOTER_TEXT, commandName = 'who-at-me'): Promise<Array<h>> {
+export async function formatWhoAtMeAsImage(ctx: Context, session: any, channelId: string | null, targetUserId: string, page: number, pageSize: number, logger: Logger, textFontPath?: string, renderColors?: RenderColors, imageType?: ImageType, screenshotQuality?: number, deviceScaleFactor?: number, imageFooterText = DEFAULT_IMAGE_FOOTER_TEXT, commandName = 'who-at-me', cacheMode: GuildMemberCacheMode = 'ttl'): Promise<Array<h>> {
   const result = await getAtMentionRecords(ctx, session.platform, targetUserId, channelId, page, pageSize);
 
   if (result.records.length === 0) {
@@ -234,7 +239,7 @@ export async function formatWhoAtMeAsImage(ctx: Context, session: any, channelId
   const page_puppeteer = await ctx.puppeteer.page();
   try {
     const runtimeFontPath = await resolveRuntimeFontPath(ctx, logger, textFontPath);
-    const htmlContent = await getWhoAtMeImageHtmlTemplate(ctx, session, result, channelId, runtimeFontPath, renderColors || defaultColors, logger, imageFooterText);
+    const htmlContent = await getWhoAtMeImageHtmlTemplate(ctx, session, result, channelId, runtimeFontPath, renderColors || defaultColors, logger, imageFooterText, cacheMode);
     const resolvedDeviceScaleFactor = Math.max(0.5, Math.min(5, Number(deviceScaleFactor) || 2.5));
 
     await page_puppeteer.setViewport({ width: 600, height: 1, deviceScaleFactor: resolvedDeviceScaleFactor });

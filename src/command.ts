@@ -1,8 +1,9 @@
 import { Context, h, Logger } from 'koishi'
 
-import type { Config } from './config'
+import type { Config, GuildMemberCacheMode } from './config'
 import { MESSSAGE_FORM } from './type'
 import { getAtMentionRecords, parseMessageContent, formatWhoAtMeAsImage } from './pptr'
+import { getGuildMemberSafe } from './member'
 
 const DEFAULT_COMMAND_NAME = 'who-at-me';
 const DEFAULT_COMMAND_ALIAS = '谁艾特我';
@@ -59,11 +60,11 @@ export function who_at_me(ctx: Context, config: Config) {
         let whoAtMeMessage;
 
         if (config.messageForm === MESSSAGE_FORM.TEXT) {
-          whoAtMeMessage = await formatWhoAtMeAsText(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, commandName);
+          whoAtMeMessage = await formatWhoAtMeAsText(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, commandName, config.guildMemberCacheMode);
         } else if (config.messageForm === MESSSAGE_FORM.IMAGE) {
-          whoAtMeMessage = await formatWhoAtMeAsImage(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, config.textFontPath, config.renderColors, config.imageType, config.screenshotQuality, config.deviceScaleFactor, config.imageFooterText, commandName);
+          whoAtMeMessage = await formatWhoAtMeAsImage(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, config.textFontPath, config.renderColors, config.imageType, config.screenshotQuality, config.deviceScaleFactor, config.imageFooterText, commandName, config.guildMemberCacheMode);
         } else if (config.messageForm === MESSSAGE_FORM.FORWARD) {
-          whoAtMeMessage = await formatWhoAtMeAsForward(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, commandName);
+          whoAtMeMessage = await formatWhoAtMeAsForward(ctx, session, queryChannelId, TARGET_USERID, page, pageSize, whoAtMeLogger, commandName, config.guildMemberCacheMode);
         }
 
         await session.send(whoAtMeMessage);
@@ -106,7 +107,7 @@ export function getUserIdFromStr(input: string): string | null {
 }
 
 
-async function formatWhoAtMeAsText(ctx: Context, session: any, channelId: string | null, targetUserId: string, page: number, pageSize: number, logger: Logger, commandName = DEFAULT_COMMAND_NAME): Promise<Array<h>> {
+async function formatWhoAtMeAsText(ctx: Context, session: any, channelId: string | null, targetUserId: string, page: number, pageSize: number, logger: Logger, commandName = DEFAULT_COMMAND_NAME, cacheMode: GuildMemberCacheMode = 'ttl'): Promise<Array<h>> {
   const result = await getAtMentionRecords(ctx, session.platform, targetUserId, channelId, page, pageSize);
 
   if (result.records.length === 0) {
@@ -128,12 +129,15 @@ async function formatWhoAtMeAsText(ctx: Context, session: any, channelId: string
     const date = new Date(Number(record.timestamp)).toLocaleString('zh-CN');
     const globalIndex = (result.currentPage - 1) * result.pageSize + i + 1;
 
-    const authorUserObj = await session.bot.getGuildMember(session.guildId, record.userId);
+    const authorUserObj = await getGuildMemberSafe(session, session.guildId, record.userId, cacheMode, logger);
+    const authorDesc = authorUserObj.isFallback
+      ? `消息作者: ${authorUserObj.name} [未在群内]\n`
+      : `消息作者: ${authorUserObj.name} (${authorUserObj.userId})${authorUserObj.nick ? ` (${authorUserObj.nick})` : ''}\n`;
     
     res.push( h.text(`------------------\n`) );
     res.push( h.text(`${globalIndex}. [${date}]\n`) );
-    res.push( h.text(`消息作者: ${authorUserObj.user.name} (${authorUserObj.user.userId})${authorUserObj.nick ? ` (${authorUserObj.nick})` : ''}\n`) );
-    res.push( ...(await parseMessageContent(ctx, session, record.content)) );
+    res.push( h.text(authorDesc) );
+    res.push( ...(await parseMessageContent(ctx, session, record.content, cacheMode, logger)) );
     res.push( h.text('\n\n') );
   }
 
@@ -152,7 +156,7 @@ async function formatWhoAtMeAsText(ctx: Context, session: any, channelId: string
   return res;
 }
 
-async function formatWhoAtMeAsForward(ctx: Context, session: any, channelId: string | null, targetUserId: string, page: number, pageSize: number, logger: Logger, commandName = DEFAULT_COMMAND_NAME): Promise<string> {
+async function formatWhoAtMeAsForward(ctx: Context, session: any, channelId: string | null, targetUserId: string, page: number, pageSize: number, logger: Logger, commandName = DEFAULT_COMMAND_NAME, cacheMode: GuildMemberCacheMode = 'ttl'): Promise<string> {
   const result = await getAtMentionRecords(ctx, session.platform, targetUserId, channelId, page, pageSize);
 
   if (result.records.length === 0) {
@@ -189,17 +193,20 @@ async function formatWhoAtMeAsForward(ctx: Context, session: any, channelId: str
     const date = new Date(Number(record.timestamp)).toLocaleString('zh-CN');
     const globalIndex = (result.currentPage - 1) * result.pageSize + i + 1;
 
-    const authorUserObj = await session.bot.getGuildMember(session.guildId, record.userId);
+    const authorUserObj = await getGuildMemberSafe(session, session.guildId, record.userId, cacheMode, logger);
+    const authorDesc = authorUserObj.isFallback
+      ? `消息作者: ${authorUserObj.name} [未在群内]\n\n`
+      : `消息作者: ${authorUserObj.name} (${authorUserObj.userId})${authorUserObj.nick ? ` (${authorUserObj.nick})` : ''}\n\n`;
 
     let messageBlockContentArr = [
       `${globalIndex}. [${date}]\n`,
-      `消息作者: ${authorUserObj.user.name} (${authorUserObj.user.userId})${authorUserObj.nick ? ` (${authorUserObj.nick})` : ''}\n\n`,
-      `${(await parseMessageContent(ctx, session, record.content)).join('')}`
+      authorDesc,
+      `${(await parseMessageContent(ctx, session, record.content, cacheMode, logger)).join('')}`
     ];
 
     await addMessageBlock(
-      authorUserObj.user.userId,
-      `No.${i} ${authorUserObj.user.name}`,
+      authorUserObj.userId,
+      `No.${i} ${authorUserObj.name}`,
       messageBlockContentArr.join('')
     );
   }

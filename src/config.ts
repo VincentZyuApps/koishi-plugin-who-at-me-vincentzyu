@@ -4,6 +4,8 @@ import { DEFAULT_LXGW_WENKAI_PATH } from './fonts'
 import { IMAGE_TYPES, ImageType, MESSSAGE_FORM } from './type'
 
 
+export type GuildMemberCacheMode = 'off' | 'ttl' | 'permanent'
+
 // ==========================================================================
 // 🧩 插件配置项
 // 以下配置决定 who-at-me (谁艾特我) 插件的行为
@@ -18,6 +20,8 @@ export interface RenderColors {
   separatorColor: string
   authorTextColor: string
   authorBgColor: string
+  fallbackAuthorTextColor: string
+  fallbackAuthorBgColor: string
   footerTextColor: string
 }
 
@@ -33,6 +37,8 @@ export const defaultColors: RenderColors = {
   separatorColor: '#CCCCCC',
   authorTextColor: '#52449e',
   authorBgColor: '#EEEBF5',
+  fallbackAuthorTextColor: '#D97706',
+  fallbackAuthorBgColor: '#FFF3E0',
   footerTextColor: '#888888',
 }
 
@@ -46,6 +52,8 @@ export const RenderColorsSchema = Schema.object({
   separatorColor: Schema.string().role('color').default('#CCCCCC').description('➖ 分隔线颜色'),
   authorTextColor: Schema.string().role('color').default('#52449e').description('👤 作者名称文字颜色'),
   authorBgColor: Schema.string().role('color').default('#EEEBF5').description('👤 作者信息区背景色'),
+  fallbackAuthorTextColor: Schema.string().role('color').default('#D97706').description('⚠️ 退群/名片获取失败时作者文字颜色'),
+  fallbackAuthorBgColor: Schema.string().role('color').default('#FFF3E0').description('⚠️ 退群/名片获取失败时作者背景色'),
   footerTextColor: Schema.string().role('color').default('#888888').description('📄 页脚文字颜色'),
 })
 
@@ -72,6 +80,9 @@ export interface Config {
 
   // 🎨 渲染颜色配置
   renderColors: RenderColors
+
+  // 🛡️ 成员缓存防抖配置
+  guildMemberCacheMode: GuildMemberCacheMode
 
   // 🐛 调试配置
   enableVerboseConsoleLog: boolean
@@ -166,6 +177,19 @@ export const Config = Schema.intersect([
   Schema.object({
     renderColors: RenderColorsSchema,
   }).role('table').default({ renderColors: defaultColors }).description('🎨 渲染颜色设置'),
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 🛡️ 第五组：群成员名片缓存与防抖配置
+  // ──────────────────────────────────────────────────────────────────────────
+  Schema.object({
+    guildMemberCacheMode: Schema.union([
+      Schema.const('off').description('❌ 关闭缓存：完全不做防抖，每次都请求协议端'),
+      Schema.const('ttl').description('⏳ 定时过期（推荐）：内存缓存 10 分钟，到期自动刷新'),
+      Schema.const('permanent').description('♾️ 进程常驻：Koishi 运行期间常驻内存，重启后清空'),
+    ]).role('radio')
+      .default('ttl')
+      .description('🛡️ 群成员名片缓存与防抖策略<br>用于防止重复拉取成员信息，避免成员退群或频控时造成刷屏报错'),
+  }).description('🛡️ 成员信息与防抖配置'),
 
   // ──────────────────────────────────────────────────────────────────────────
   // 🐛 第六组：调试配置
